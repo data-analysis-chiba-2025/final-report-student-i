@@ -1,0 +1,140 @@
+---
+title: "Analysis of Global Holidays and Travel"
+author: Student I
+format: docx
+---
+
+```{r}
+#| label: setup
+#| echo: false
+#| message: false
+
+# Load packages
+library(tidyverse)
+library(scales)
+global_holidays <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-12-24/global_holidays.csv')
+monthly_passengers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-12-24/monthly_passengers.csv')
+```
+
+## Introduction
+
+This data is about "Global holiday datasets for understanding seasonal human mobility and population dynamics" by Shengjie Lai (et al)
+
+The Global Holiday and Travel dataset includes monthly air passenger numbers and national holiday information for many countries, from `r min(monthly_passengers$Year)` to `r max(monthly_passengers$Year)`. The data combine domestic and international flight passenger counts with holiday records.
+
+Air passenger numbers are generally expected to increase over time, as economic growth and rising tourism drive greater demand for travel. At the same time, passenger volumes often show seasonal differences, as national holidays can boost domestic and international tourism. However, the scale of these changes can vary significantly across regions and between countries.
+
+Here, we analyze the Global Holiday and Travel dataset to answer two questions:
+
+How have air passenger numbers changed in major Asian countries since 2010?
+
+In major European countries with high passenger numbers, how much does the average number of passengers differ between months with public holidays and those without?
+
+Here, we analyze the Global holiday datasets to answer the following questions:
+
+- How have air passenger numbers changed in major Asian countries since 2010?
+
+- In major European countries with high passenger numbers, how much does the average number of air passengers differ between months with public holidays and those without?
+
+## Data visualization
+
+#| echo: false
+library(dplyr)
+library(ggplot2)
+
+
+# Question 1: Asian countries' air passenger trends since 2010
+
+```{r}
+asia_countries <- c("JPN", "CHN", "KOR", "THA", "IND")
+
+asia_trends <- monthly_passengers %>%
+  filter(ISO3 %in% asia_countries, Year >= 2010) %>%
+  group_by(Year, ISO3) %>%
+  summarise(Total = sum(Total_OS, na.rm = TRUE))
+
+library(scales)  
+
+ggplot(asia_trends, aes(x = Year, y = Total, color = ISO3)) +
+  geom_line(linewidth = 1) +  
+  scale_y_continuous(labels = comma) +  
+  labs(
+    title = "Figure 1",
+    subtitle = "Yearly Air Passenger Trends in Major Asian Countries (2010–present)",
+    x = "Year",
+    y = "Total Air Passengers",
+    color = "Country"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+{{< pagebreak >}}
+
+```{r}
+
+#| echo: false
+# Question 2: European countries - Holiday vs Non-Holiday month averages
+
+europe_countries <- c("FRA", "DEU", "GBR", "ITA", "ESP") 
+
+library(lubridate)
+holidays_monthly <- global_holidays %>%
+  mutate(Year = year(Date), Month = month(Date)) %>%
+  group_by(ISO3, Year, Month) %>%
+  summarise(Holiday_Count = n())
+
+passengers_holiday <- monthly_passengers %>%
+  left_join(holidays_monthly, by = c("ISO3", "Year", "Month")) %>%
+  mutate(
+    Holiday_Count = ifelse(is.na(Holiday_Count), 0, Holiday_Count),
+    Holiday_Flag = ifelse(Holiday_Count == 0, "No Holiday", "Holiday")
+  ) %>%
+  filter(ISO3 %in% europe_countries, Year >= 2010)
+
+holiday_summary <- passengers_holiday %>%
+  group_by(ISO3, Holiday_Flag) %>%
+  summarise(Average_Passengers = mean(Total_OS, na.rm = TRUE))
+
+ggplot(holiday_summary, aes(x = ISO3, y = Average_Passengers, fill = Holiday_Flag)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Figure 2",
+    subtitle = "Average Monthly Air Passengers (Holiday vs Non-Holiday Months, Europe)",
+    x = "Country",
+    y = "Average Passengers",
+    fill = "Month Type"
+  ) +
+  theme_minimal()
+
+holidays_monthly %>%
+  filter(ISO3 == "ESP") %>%
+  arrange(Year, Month) %>%
+  View()
+
+```
+
+
+{{< pagebreak >}}
+
+
+## Discussion
+The visualizations reveal two distinct patterns in air travel dynamics.
+
+**Message (Figure 1):**
+In major Asian countries, air passenger numbers generally increased from 2010 onward, with China and India showing the steepest growth compared to Japan, Korea, and Thailand. This suggests rapid expansion of air travel markets in emerging economies, while more mature markets experienced relatively stable trends.
+
+**Message (Figure 2):**
+In major European countries, the average number of air passengers per month is consistently higher during months with public holidays than in months without. This pattern is visible across all selected countries, though the magnitude of the difference varies, with Germany and the United Kingdom showing the most pronounced effects.
+
+**Insights / Conclusions:**
+These findings highlight how air travel is shaped by both long-term economic and market growth (as seen in Asia) and short-term seasonal fluctuations (as seen in Europe). The Asian trend underscores the importance of monitoring emerging markets, where infrastructure and policy may need to adapt to rising demand. The European comparison illustrates how national holidays significantly boost passenger traffic, which is critical information for airlines and policymakers to optimize capacity planning and manage seasonal demand surges.
+
+
+## References
+
+Lai S., Sorichetta A. and WorldPop (2020). Global Public and School Holidays 2010-2019. Mapping seasonal denominator dynamics in low- and middle-income settings, and Exploring the seasonality of COVID-19, funded by The Bill and Melinda Gates Foundation.
+
+Lai S., Sorichetta A. and WorldPop (2020). Monthly volume of airline passengers in 90 countries 2010-2018. Mapping seasonal denominator dynamics in low- and middle-income settings, and Exploring the seasonality of COVID-19, funded by The Bill and Melinda Gates Foundation.
